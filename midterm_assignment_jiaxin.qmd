@@ -1,0 +1,958 @@
+---
+title: "midterm_jiaxin"
+format: html
+editor: visual
+---
+
+```{r, include=FALSE}
+library(gridExtra)
+library(knitr)
+library(tidyverse)
+library(ggplot2)
+library(kableExtra)
+library(tidyverse)
+library(stringr)
+```
+
+```{r}
+census1 <- read_csv("1.csv", col_names = TRUE, skip = 1)
+census1_colnames <- read_csv("census1_colnames.csv", col_names = TRUE, skip = 1 )
+# View(census1_colnames)
+
+census2 <- read_csv("2.csv", col_names = TRUE, skip = 1)
+census2_colnames <- read_csv("census2_colnames.csv", col_names = TRUE, skip = 1 )
+# View(census2_colnames)
+
+census3 <- read_csv("3.csv", col_names = TRUE, skip = 1)
+census3_colnames <- read_csv("census3_colnames.csv", col_names = TRUE, skip = 1 )
+# View(census3_colnames)
+
+census1 <- census1 |>
+  mutate(County = str_extract(`Geographic Area Name`, "^[^,]+"),
+         State = str_extract(`Geographic Area Name`, "(?<=,\\s).+$")) |>
+  select(1:3)
+names(census1)[names(census1) == "Estimate!!Total"] <- "total_popu"
+names(census1)[names(census1) == "Geographic Area Name"] <- "GeographicAreaName"
+# View(census1)
+
+census2 <- census2 |>
+  select(1:3, 7, 11, 15)
+names(census2)[names(census2) == "Geographic Area Name"] <- "GeographicAreaName"
+names(census2)[names(census2) == "Estimate!!SEX AND AGE!!Total population"] <- "total_popu_sex_age"
+names(census2)[names(census2) == "Estimate!!SEX AND AGE!!Total population!!Male"] <- "total_popu_male"
+names(census2)[names(census2) == "Estimate!!SEX AND AGE!!Total population!!Female"] <- "total_popu_female"
+names(census2)[names(census2) == "Estimate!!SEX AND AGE!!Total population!!Sex ratio (males per 100 females)"] <- "total_popu_sex_ratio"
+# View(census2)
+
+
+census3 <- census3 |>
+  select(1:3, 7, 35, 43, 47)
+names(census3)[names(census3) == "Geographic Area Name"] <- "GeographicAreaName"
+names(census3)[names(census3) == "Estimate!!Total!!Population for whom poverty status is determined"] <- "total_poverty_popu"
+names(census3)[names(census3) == "Estimate!!Total!!Population for whom poverty status is determined!!AGE!!Under 18 years"] <- "total_poverty_under18"
+names(census3)[names(census3) == "Estimate!!Total!!Population for whom poverty status is determined!!AGE!!60 years and over"] <- "total_poverty_over60"
+names(census3)[names(census3) == "Estimate!!Total!!Population for whom poverty status is determined!!SEX!!Male"] <- "total_poverty_male"
+names(census3)[names(census3) == "Estimate!!Total!!Population for whom poverty status is determined!!SEX!!Female"] <- "total_poverty_female"
+# View(census3)
+
+
+
+storm_events_details2020 <- read_csv("se_details2020.csv", col_names = TRUE)
+# View(storm_events_details2020)
+storm_events_details2021 <- read_csv("se_details2021.csv", col_names = TRUE)
+# View(census3)
+storm_locations_details2021 <- read_csv("se_locations2021.csv", col_names = TRUE)
+# View(storm_locations_details2021)
+floods_damage <- read_csv("floods_damage.csv", col_names = TRUE)
+# View(floods_damage)
+disaster_declarations <- read_csv("disaster_declarations.csv", col_names = TRUE)
+# View(disaster_declarations)
+
+```
+
+```{r, include=FALSE}
+combined_data <- rbind(storm_events_details2020, storm_events_details2021)
+colnames(combined_data) <- colnames(storm_events_details2020)
+assign("storm_events_details2020_2021", combined_data)
+# View(storm_events_details2020_2021)
+# colnames(storm_events_details2020_2021)
+```
+
+```{r, include=FALSE}
+eda1 <- storm_events_details2020_2021 |>
+  filter(EVENT_TYPE == "Flood") |>
+  select(BEGIN_YEARMONTH, BEGIN_DAY, END_DAY, BEGIN_TIME, END_TIME, BEGIN_DATE_TIME, END_DATE_TIME, EVENT_ID, STATE, YEAR, INJURIES_DIRECT, INJURIES_INDIRECT, DEATHS_DIRECT, DEATHS_INDIRECT, DAMAGE_PROPERTY, DAMAGE_CROPS, FLOOD_CAUSE, BEGIN_LAT, BEGIN_LON)
+
+eda1$DAMAGE_PROPERTY <- as.numeric(sub("[A-Za-z]", "", eda1$DAMAGE_PROPERTY))
+eda1$DAMAGE_CROPS <- as.numeric(sub("[A-Za-z]", "", eda1$DAMAGE_CROPS))
+eda1$DAMAGE_PROPERTY[grepl("K", eda1$DAMAGE_PROPERTY)] <- eda1$DAMAGE_PROPERTY[grepl("K", eda1$DAMAGE_PROPERTY)] * 1000
+eda1$DAMAGE_CROPS[grepl("K", eda1$DAMAGE_CROPS)] <- eda1$DAMAGE_CROPS[grepl("K", eda1$DAMAGE_CROPS)] * 1000
+eda1$DAMAGE_PROPERTY[grepl("M", eda1$DAMAGE_PROPERTY)] <- eda1$DAMAGE_PROPERTY[grepl("M", eda1$DAMAGE_PROPERTY)] * 1000000
+eda1$DAMAGE_CROPS[grepl("M", eda1$DAMAGE_CROPS)] <- eda1$DAMAGE_CROPS[grepl("M", eda1$DAMAGE_CROPS)]
+
+eda1$duration <- 2400 * (eda1$END_DAY-eda1$BEGIN_DAY) + (eda1$END_TIME - eda1$BEGIN_TIME)
+eda1$injuries_total <- eda1$INJURIES_DIRECT + eda1$INJURIES_INDIRECT
+eda1$deaths_total <- eda1$DEATHS_DIRECT + eda1$DEATHS_INDIRECT
+eda1$damage_total <- eda1$DAMAGE_PROPERTY + eda1$DAMAGE_CROPS
+
+# View(eda1)
+```
+
+# Exploratory data analysis(EDA) for floods data in 2020-2021
+
+# 
+
+# 
+
+## Abstract
+
+"Floods are among the most destructive natural disasters." With the help of various data resources such as NOAA data, FEMA data, I want to "deploy all the tools of EDA: visualization, transformation, and modelling" to explore these data sets. To investigate the characteristics of the flooding hazards that will occur across the United States between 2020 and 2021, resulting in deaths, injuries, and property damage, and to write this report on the results of my investigative work.
+
+## 
+
+## Catalogue
+
+### 1 Introduction
+
+### 2 Questions to be explored
+
+### 3 Main findings of the EDA
+
+### 3.1 Characterisation of flood hazards during the period 2020-2021
+
+### 4 Cnclusions and summary
+
+### 5 Limitations and future plan
+
+### Reference
+
+## 
+
+## 1 Introduction
+
+## 
+
+## 2 Questions to be explored
+
+How dangerous are floods? How expensive? Is there any pattern to the kinds of communities that suffer losses from floods?
+
+## 
+
+## 3 Main findings of the EDA
+
+### 3.1 Characterisation of flood hazards during the period 2020-2021
+
+Initially, I want to develop an understanding of the data. Here, I want to use the two questions below (cited from the book: R for Data Science) and respond to them to help to initially understand the data about floods in 2020-2021.
+
+Question1:What type of variation occurs within my variables?
+
+Question2: What type of covariation occurs between my variables?
+
+#### 3.1.1 The distributions of those informative variables
+
+I've learned from the book(R for Data Science) that "Every variable has its own pattern of variation, which can reveal interesting information about how that it varies between measurements on the same observation as well as across observations."
+
+So, first, I'd like to visualize the distribution of values of those informative variables about the floods in 2020-2021.
+
+
+
+
+
+
+
+With the above visualization results, it seems safe to assume that the vast majority of floods occurring between 2020 and 2021 last for a longer period of time and cause fewer casualties and damage. It can be further analysed whether the duration of a flood can be considered to have a positive correlation with the number of casualties and damages caused by the flood, i.e. the shorter the duration of the flood, the smaller the number of casualties and damages caused by the flood.
+
+```{r}
+cor_duration_injuries <- cor(eda1$duration, eda1$injuries_total)
+cor_duration_deaths <- cor(eda1$duration, eda1$deaths_total)
+cor_duration_damage <- cor(eda1$duration, eda1$damage_total)
+
+cat("Pearson Correlation between duration and injuries_total: ", cor_duration_injuries, "\n")
+cat("Pearson Correlation between duration and deaths_total: ", cor_duration_deaths, "\n")
+cat("Pearson Correlation between duration and damage_total: ", cor_duration_damage, "\n")
+```
+
+Based on the Pearson correlation coefficient results, I found that:
+
+(1) The Pearson correlation between "duration" and "injuries_total" is approximately -0.01055809. This value is close to zero, and the negative correlation suggests that there may be a weak negative association between the duration of the flood and the total injuries;
+
+(2) The Pearson correlation between "duration" and "deaths_total" is approximately -0.01004481. This value is also very close to zero, and the negative correlation implies that there may be a very weak or almost no linear relationship between the duration of the flood and the number of deaths.
+
+(3) The Pearson correlation between "duration" and "damage_total" is approximately 0.01144618. This value is likewise close to zero, and the positive correlation suggests there is very little or almost no linear relationship between the duration of the flood and the total damage to property and crops.
+
+In summary, the Pearson correlation coefficient results suggest that there is no strong linear relationship between these variables. This may imply that the linear relationships are very weak or potentially nonlinear.
+
+Therefore, we cannot simply and arbitrarily say that the shorter the duration of a flood, the fewer casualties, damages, etc. it causes.
+
+## 
+
+### 3.1.2 Flood characteristics of each state in 2020-2021
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+eda1$YEAR <- factor(eda1$YEAR, levels = c("2020", "2021"))
+
+summary_data <- eda1 %>%
+  group_by(STATE, YEAR) %>%
+  summarize(
+    avg_duration = mean(duration),
+    avg_injuries = mean(injuries_total),
+    avg_deaths = mean(deaths_total),
+    avg_damage = mean(damage_total)
+  )
+
+threshold <- 10  # Adjust this threshold as needed
+
+filtered_data <- summary_data %>%
+  filter(avg_duration >= threshold, avg_injuries >= threshold, avg_deaths >= threshold, avg_damage >= threshold)
+
+ggplot(filtered_data, aes(x = STATE, y = avg_duration, fill = YEAR)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_text(aes(label = round(avg_duration, 2)), vjust = -0.5) +  
+  labs(
+    title = "Average Duration of Floods in 2020-2021",
+    x = "State",
+    y = "Average Duration",
+    fill = "Year"
+  ) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 6.5))
+
+ggplot(filtered_data, aes(x = STATE, y = avg_injuries, fill = YEAR)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_text(aes(label = round(avg_injuries, 2)), vjust = -0.5) +  
+  labs(
+    title = "Average Injuries Caused by Floods in 2020-2021",
+    x = "State",
+    y = "Average Injuries",
+    fill = "Year"
+  ) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 6.5))
+
+ggplot(filtered_data, aes(x = STATE, y = avg_deaths, fill = YEAR)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_text(aes(label = round(avg_deaths, 2)), vjust = -0.5) +  
+  labs(
+    title = "Average Deaths Caused by Floods in 2020-2021",
+    x = "State",
+    y = "Average Deaths",
+    fill = "Year"
+  ) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 6.5))
+
+ggplot(filtered_data, aes(x = STATE, y = avg_damage, fill = YEAR)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_text(aes(label = round(avg_damage, 2)), vjust = -0.5) + 
+  labs(
+    title = "Average Damage Caused by Floods in 2020-2021",
+    x = "State",
+    y = "Average Damage",
+    fill = "Year"
+  ) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 6.5))
+
+
+
+
+```
+
+```{r, include=FALSE}
+
+# 这个图再完善一下，设置阈值，设置间隔。
+eda1 |>
+  count(STATE, FLOOD_CAUSE) |>
+  ggplot(aes(x = STATE, y = FLOOD_CAUSE)) +
+  geom_tile(aes(fill = n)) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 6.5),
+        axis.text.y = element_text(angle = 60, hjust = 1, size = 8.0)) +
+  labs(title = "Flood Cause of Different States",
+       x = "State", 
+       y = "Flood Cause", fill = "Count") +
+  scale_fill_viridis_c(trans = "reverse")
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+eda1$duration <- eda1$duration /2400
+
+
+if (require("maps")) {
+data(us.cities)
+capitals <- subset(us.cities, capital == 2)
+ggplot(capitals, aes(long, lat)) +
+  geom_point(data = eda1, aes(x = BEGIN_LON, y = BEGIN_LAT, colour = duration)) +
+  labs(x = "Longitude", y = "Latitude") +
+  theme_classic()+
+  scale_color_gradient(low = "pink", high = "red") +
+  labs(
+    title = "Duration days of flooding across the United States in 2020-2021"
+  )+
+  borders("state") +
+  scale_size_area() +
+  coord_quickmap() +
+  coord_cartesian(xlim = c(-127, -57), ylim = c(22, 57))
+}
+
+
+
+
+
+
+ggplot(eda1, aes(x = BEGIN_LON, y = BEGIN_LAT, colour = duration)) +
+  geom_point(aes(alpha=0.5)) +
+  labs(x = "Longitude", y = "Latitude") +
+  theme_classic()+
+  scale_color_gradient(low = "pink", high = "red") +
+  labs(
+    title = "Duration days of flooding across the United States in 2020-2021"
+  )+
+  coord_cartesian(xlim = c(-127, -57), ylim = c(22, 57))
+
+
+```
+
+
+
+
+
+
+```{r}
+#eda1$Timestamp <- as.POSIXct(paste(eda1$BEGIN_YEARMONTH, eda1$BEGIN_DAY, eda1$BEGIN_TIME), format = "%Y%m%d %H:%M:%S")
+#eda1 <- eda1 %>% arrange(Timestamp)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 3.2 2020至2021年美国各地洪水灾害造成的损失分析
+
+#### 3.2.1 从救援角度分析，即援助了多少，可以反映出损失了多少
+
+问题1： 3.2.1 这里我们假设了救援与损失呈正相关 假设验证：
+
+重要的分析变量：
+
+disasterNumber Title Disaster Number Type smallint Description Sequentially assigned number used to designate an event or incident declared as a disaster. For more information on the disaster process, https://www.fema.gov/disasters/how-declared
+
+（1）totalObligatedAmountHmgp： Total Obligated Amount HMGP Total amount obligated under the Hazard Mitigation Grant Program in dollars. The total amount obligated represents the amount obligated for Regular Project Costs, Planning Costs, Initiative Project Costs, Recipient Management Costs, Recipient Admin Costs and Subrecipient Admin Costs.
+
+（2）iaLoadDate： Title：IA Load Date The date the Individual Assistance (IA) data was updated by NEMIS
+
+（3）paLoadDate： Title： PA Load Date The date the Public Assistance (PA) data was updated by NEMIS
+
+totalObligatedAmountPa Title Total Obligated Amount PA The Public Assistance grant funding available in dollars to the grantee (State), for sub-grantee approved Project Worksheets
+
+totalObligatedAmountCatAb Title Total Obligated Amount Category A and B The Public Assistance grant funding available in dollars to the grantee (State), for sub-grantee approved Project Worksheets in categories A and B, or Emergency Work. Category A: Debris removal; Category B: Emergency protective measures.
+
+totalObligatedAmountCatC2g： Title： Total Obligated Amount Category C to G The Public Assistance grant funding available in dollars to the grantee (State), for sub-grantee approved Project Worksheets in categories C through G, or Permanent Work. Category C: Roads and bridges; Category D: Water control facilities; Category E: Public buildings and contents; Category F: Public utilities; Category G: Parks, recreational, and other facilities.
+
+（4） totalAmountOnaApproved Title Total Amount ONA Approved Type decimal Description The total amount approved for Other Needs Assistance (ONA) from the Individual and Households Program (IHP) in dollars.
+
+```{r}
+unique(disaster_declarations$incidentType)
+
+flood_declarations <- disaster_declarations |>
+  filter(incidentBeginDate >= as.Date("2020-01-01") & incidentBeginDate <= as.Date("2021-12-31") & incidentType == "Flood") 
+  
+# View(flood_declarations)
+
+flood_declarations_damage <- merge(flood_declarations, floods_damage, by = "disasterNumber")
+# View(flood_declarations_damage)
+
+```
+
+```{r, include=FALSE}
+# colnames(floods_damage)
+```
+
+```{r}
+# 这幅图调整一下y轴的显示范围，那些偏离点不显示，这样就不会出来的箱型图都沉在底部； 然后把横轴变纵轴，这样很长的标签名就会在图的左边，看起来会比现在要好。
+
+
+
+library(ggplot2)
+library(tidyr)
+
+selected_vars <- c("totalNumberIaApproved", "totalAmountIhpApproved", "totalAmountHaApproved",
+                   "totalAmountOnaApproved", "totalObligatedAmountPa", "totalObligatedAmountCatAb",
+                   "totalObligatedAmountCatC2g", "totalObligatedAmountHmgp")
+
+melted_data <- floods_damage %>%
+  select(all_of(selected_vars)) %>%
+  pivot_longer(everything(), names_to = "Variable", values_to = "Value")
+
+ggplot(melted_data, aes(x = Variable, y = Value)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 9.0)) +
+  labs(title = "Distributions of Informative Variables in the OpenFEMA Dataset",
+       x = "Variables", y = "Values") 
+```
+
+受灾社区与人口分析
+问题：美国各地的各州各社区的人的受灾情况
+
+```{r}
+library(stringr)
+census_popu <- full_join(census1, census2, by="Geography")
+census_popu <- full_join(census_popu, census3, by="Geography")
+View(census_popu)
+
+# USAcounties <- read.csv("USAcounties.csv")
+# View(USAcounties)
+
+```
+
+
+
+
+
+cz_type Ex: C, Z , M
+Indicates whether the event happened in a (C) county/parish, (Z) zone or (M) marine
+cz_fips Ex: 245, 003, 155
+The county FIPS number is a unique number assigned to the county by the National Institute
+for Standards and Technology (NIST) or NWS Forecast Zone Number (See addendum)
+
+```{r}
+storm_events_details2020_2021 <- storm_events_details2020_2021 |>
+  filter(CZ_TYPE == "C")
+
+census_popu <- census_popu %>%
+  select(-where(~ all(. %in% c("null", NA))))
+census_popu <- census_popu %>%
+  mutate(CZ_FIPS = str_extract(Geography, "\\d{3}$"))
+
+
+storm_events_details2020_2021$CZ_FIPS <- as.character(storm_events_details2020_2021$CZ_FIPS)
+merged_data <- full_join(census_popu, storm_events_details2020_2021, by = "CZ_FIPS")
+eda2 <- merged_data |>
+  filter(EVENT_TYPE %in% c("Flash Flood", "Flood"))
+# View(eda2)
+
+colnames(eda2)
+
+
+
+
+
+
+
+# Extract the month and calculate the count of flood events for each month
+df_month <- eda2 |>
+  group_by(MONTH_NAME) |>
+  summarize(Flood_Count = n())
+
+library(ggplot2)
+
+# Assuming you already have df_month with MONTH_NAME and Flood_Count
+# Order the df_month by Flood_Count in descending order
+df_month <- df_month[order(-df_month$Flood_Count), ]
+
+# Create a histogram
+ggplot(df_month, aes(x = factor(MONTH_NAME, levels = MONTH_NAME), y = Flood_Count)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Number of flood disasters in different months",x = "Month", y = "Flood Count") +
+  scale_x_discrete(labels = df_month$MONTH_NAME) +
+  geom_text(aes(label = Flood_Count), vjust = -0.5, size = 3) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 11))
+
+
+
+# unique(eda2$MONTH_NAME)
+```
+
+
+
+```{r}
+
+
+```
+
+
+
+
+```{r}
+eda2 <- merged_data |>
+  filter(EVENT_TYPE %in% c("Flash Flood", "Flood"))
+
+
+
+if (require("maps")) {
+data(us.cities)
+capitals <- subset(us.cities, capital == 2)
+ggplot(capitals, aes(long, lat)) +
+  geom_point(data = filter(eda2, total_popu > 0), aes(x = BEGIN_LON, y = BEGIN_LAT, colour = total_popu)) +
+  labs(x = "Longitude", y = "Latitude") +
+  theme_classic()+
+  scale_color_gradient(low = "pink", high = "red") +
+  labs(
+    title = "Population exposed to flooding across the U.S. in 2020-2021"
+  )+
+  borders("state") +
+  scale_size_area() +
+  coord_quickmap() +
+  coord_cartesian(xlim = c(-127, -57), ylim = c(22, 57))
+}
+
+
+
+
+
+
+
+
+if (require("maps")) {
+data(us.cities)
+capitals <- subset(us.cities, capital == 2)
+ggplot(capitals, aes(long, lat)) +
+  geom_point(data = filter(eda2, total_popu > 0), aes(x = BEGIN_LON, y = BEGIN_LAT, colour = total_poverty_popu/total_popu_sex_age)) +
+  labs(x = "Longitude", y = "Latitude") +
+  theme_classic()+
+  scale_color_gradient(low = "lightblue", high = "blue") +
+  labs(
+    title = "Proportion of Poor People Among Those Affected by Floods",
+    color = "Proportion"  
+  ) +
+  borders("state") +
+  scale_size_area() +
+  coord_quickmap() +
+  coord_cartesian(xlim = c(-127, -57), ylim = c(22, 57))
+}
+
+
+
+
+```
+
+```{r}
+unique(eda2$FLOOD_CAUSE)
+library(ggplot2)
+
+# 创建一个数据框，包含各种洪水原因的计数
+eda2_counts <- data.frame(table(eda2$FLOOD_CAUSE))
+
+# 按照Y轴值的大小降序排列数据框
+eda2_counts <- eda2_counts[order(eda2_counts$Freq, decreasing = TRUE),]
+
+# 创建一个柱状图来可视化不同的洪水原因
+ggplot(eda2_counts, aes(x = reorder(Var1, -Freq), y = Freq)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  geom_text(aes(label = Freq), vjust = -0.2, size = 3) +  # 显示Y轴值
+  labs(
+    title = "Distribution of Different Flood Causes",
+    x = "Flood Cause",
+    y = "Count"
+  ) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+library(viridis)
+
+
+
+if (require("maps")) {
+  data(us.cities)
+  capitals <- subset(us.cities, capital == 2)
+  
+  ggplot(capitals, aes(long, lat)) +
+    geom_point(data = filter(eda2, total_popu > 0), aes(x = BEGIN_LON, y = BEGIN_LAT, colour = FLOOD_CAUSE)) +
+    labs(x = "Longitude", y = "Latitude") +
+    theme_classic() +
+    scale_color_gradient(low = "pink", high = "red") +
+    labs(
+      title = "Flood cause in different regions of the U.S. in 2020-2021",
+      color = "Flood Cause"
+    ) +
+    scale_color_viridis(discrete = TRUE) +
+    borders("state") +
+    scale_size_area() +
+    coord_quickmap() +
+    coord_cartesian(xlim = c(-127, -57), ylim = c(22, 57)) +
+    theme(legend.position = "right",   # 将图例放在底部
+          legend.key.size = unit(0.4, "lines"))  # 控制图例的大小
+}
+
+
+
+
+
+```
+
+
+```{r}
+library(ggplot2)
+
+# 创建数据框 df
+df <- eda2 %>%
+  group_by(Geography) %>%
+  summarise(sex_ratio = mean(total_popu_sex_ratio))
+
+# 创建ggplot2图表
+plot <- ggplot(df, aes(x = sex_ratio)) +
+  geom_density(fill = "lightblue") +  # 右侧分布的填充颜色
+  geom_density(data = subset(df, sex_ratio <= 100), fill = "pink") +  # 左侧分布的填充颜色
+  geom_vline(xintercept = 100, color = "red" ) +  # 添加垂直辅助线
+  labs(
+    title = "Sex Ratio Density Plot by Geographic Region (Poverty)",
+    x = "Sex Ratio (%) (Male/Female)"
+  ) +
+  theme_classic()
+
+print(plot)
+
+```
+
+
+
+
+```{r}
+library(dplyr)
+
+top_5_geographies <- eda2 %>%
+  group_by(Geography, GeographicAreaName.x) %>%
+  summarise(sex_ratio = mean(total_popu_sex_ratio)) %>%
+  arrange(sex_ratio) %>%
+  top_n(5)
+
+top_5_geographies
+
+# top_5_geographies 包含了 "sex_ratio" 值最大的 5 个 "Geography" 和对应的 "GeographicAreaName.x"
+
+equal <- top_5_geographies |>
+  filter(sex_ratio == 100)
+equal
+
+```
+
+
+```{r}
+library(ggplot2)
+
+# 创建数据框 df_age
+df_age <- eda2 %>%
+  group_by(Geography, GeographicAreaName.x) %>%
+  summarise(
+    total_poverty_under18 = mean(total_poverty_under18),
+    total_poverty_over60 = mean(total_poverty_over60),
+    total_poverty_popu = mean(total_poverty_popu),
+    young_proportion = total_poverty_under18/total_poverty_popu,
+    old_proportion = total_poverty_over60/total_poverty_popu
+  )
+
+# 创建ggplot2图表
+plot1 <- ggplot(df_age, aes(x = young_proportion)) +
+  geom_density(fill = "pink", alpha = 0.5) +
+  labs(
+    x = "Young Proportion"
+  ) +
+  theme_classic()
+
+plot2 <- ggplot(df_age, aes(x = old_proportion)) +
+  geom_density(fill = "lightblue", alpha = 0.5) +
+  labs(
+    x = "Old Proportion"
+  ) +
+  theme_classic()
+
+# 将两个图表并排显示
+grid.arrange(plot1, plot2, ncol = 2)
+
+
+```
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# 创建数据框 df_age
+df_age <- eda2 %>%
+  group_by(Geography, GeographicAreaName.x) %>%
+  summarise(
+    total_poverty_under18 = mean(total_poverty_under18),
+    total_poverty_over60 = mean(total_poverty_over60),
+    total_poverty_popu = mean(total_poverty_popu),
+    young_proportion = total_poverty_under18/total_poverty_popu,
+    old_proportion = total_poverty_over60/total_poverty_popu
+  )
+
+# 对数据框按 young_proportion 降序排序，然后选择前 5 个最大的观察值
+top_5_young_proportion <- df_age %>%
+  arrange(desc(young_proportion)) %>%
+  head(5)
+
+# 对数据框按 old_proportion 降序排序，然后选择前 5 个最大的观察值
+top_5_old_proportion <- df_age %>%
+  arrange(desc(old_proportion)) %>%
+  head(5)
+
+# 创建两个ggplot2图表，分别显示 top_5_young_proportion 和 top_5_old_proportion
+plot1 <- ggplot(top_5_young_proportion, aes(x = young_proportion, y = reorder(GeographicAreaName.x, young_proportion))) +
+  geom_bar(stat = "identity", fill = "pink") +
+  labs(
+    x = "Young Proportion",
+    y = "Area Name (Top 5)"
+  ) +
+  theme_classic()
+# theme(axis.text.y = element_text(angle = 45, hjust = 1))  # 旋转 x 轴文字
+
+plot2 <- ggplot(top_5_old_proportion, aes(x = old_proportion, y = reorder(GeographicAreaName.x, old_proportion))) +
+  geom_bar(stat = "identity", fill = "lightblue") +
+  labs(
+    x = "Old Proportion",
+    y = "Area Name (Top 5)"
+  ) +
+  theme_classic()
+# theme(axis.text.y = element_text(angle = 45, hjust = 1))  # 旋转 x 轴文字
+
+# 将两个图表上下排列
+combined_plot <- arrangeGrob(plot1, plot2, ncol = 1)
+
+# 显示图表
+grid.arrange(combined_plot)
+
+
+```
+
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# 创建数据框 df_age
+df_age <- eda2 %>%
+  group_by(Geography, GeographicAreaName.x) %>%
+  summarise(
+    total_poverty_under18 = mean(total_poverty_under18),
+    total_poverty_over60 = mean(total_poverty_over60),
+    total_poverty_popu = mean(total_poverty_popu),
+    young_proportion = total_poverty_under18/total_poverty_popu,
+    old_proportion = total_poverty_over60/total_poverty_popu
+  )
+
+
+
+top_5_young_proportion <- df_age %>%
+  arrange(young_proportion) %>%
+  head(5)
+
+# 对数据框按 old_proportion 降序排序，然后选择前 5 个最大的观察值
+top_5_old_proportion <- df_age %>%
+  arrange(old_proportion) %>%
+  head(5)
+
+# 创建两个ggplot2图表，分别显示 top_5_young_proportion 和 top_5_old_proportion
+plot1 <- ggplot(top_5_young_proportion, aes(x = young_proportion, y = reorder(GeographicAreaName.x, young_proportion))) +
+  geom_bar(stat = "identity", fill = "pink") +
+  labs(
+    x = "Young Proportion",
+    y = "Area Name (Tail 5)"
+  ) +
+  theme_classic()
+# theme(axis.text.y = element_text(angle = 45, hjust = 1))  # 旋转 x 轴文字
+
+plot2 <- ggplot(top_5_old_proportion, aes(x = old_proportion, y = reorder(GeographicAreaName.x, old_proportion))) +
+  geom_bar(stat = "identity", fill = "lightblue") +
+  labs(
+    x = "Old Proportion",
+    y = "Area Name (Tail 5)"
+  ) +
+  theme_classic()
+# theme(axis.text.y = element_text(angle = 45, hjust = 1))  # 旋转 x 轴文字
+
+# 将两个图表上下排列
+combined_plot <- arrangeGrob(plot1, plot2, ncol = 1)
+
+# 显示图表
+grid.arrange(combined_plot)
+```
+
+
+
+```{r}
+library(dplyr)
+
+flood_num <- eda2 %>%
+  group_by(CZ_NAME) %>%
+  summarise(`number of events` = n_distinct(BEGIN_DATE_TIME))
+
+
+
+library(ggplot2)
+
+library(ggplot2)
+
+ggplot(flood_num, aes(x = `number of events`)) +
+  geom_density(fill = "pink", alpha = 0.5) +
+  labs(
+    x = "Number of Events",
+    y = "Density"
+  ) +
+  theme_classic() +
+  labs(
+    title = "Distribution of Number of Flooding Events of Different Places"
+  )
+
+
+top_10_events <- head(arrange(flood_num, desc(`number of events`)), 10)
+
+ggplot(top_10_events, aes(x = reorder(CZ_NAME, `number of events`), y = `number of events`)) +
+  geom_bar(stat = "identity", fill = "lightblue") +
+  geom_text(aes(label = `number of events`), hjust = -0.2, size = 3.5) +
+  labs(
+    x = "CZ Name",
+    y = "Number of Events"
+  ) +
+  theme_classic() +
+  coord_flip() +
+  labs(
+    title = "Top 10 places affected by Flooding Events in 2020-2021"
+  )
+
+
+```
+
+
+
+
+```{r}
+colnames(floods_damage)
+
+expensive <- floods_damage |>
+  group_by(disasterNumber) |>
+  summarise(
+    expenses = sum(totalObligatedAmountHmgp, na.rm = T))
+
+
+
+
+summary(expensive$expenses)
+median(expensive$expenses)
+mean(expensive$expenses)
+max(expensive$expenses)
+
+quantile(expensive$expenses, 0.75)
+
+```
+
+
+```{r}
+eda2$total_casualties <- sum(eda2$INJURIES_DIRECT, eda2$INJURIES_INDIRECT, eda2$DEATHS_DIRECT, eda2$DEATHS_INDIRECT, na.rm = T)
+
+df <- eda2 |>
+  group_by(CZ_NAME) |>
+  summarise(
+    total_casualties = sum(total_casualties)
+  )
+
+summary(df$total_casualties)
+median(df$total_casualties)
+mean(df$total_casualties)
+max(df$total_casualties)
+
+
+
+library(ggplot2)
+library(dplyr)
+
+# 创建一个排序后的数据框，根据 total_casualties 降序排列
+top_10_cz <- df %>%
+  arrange(desc(total_casualties)) %>%
+  head(10)
+
+# 创建 ggplot2 图表
+ggplot(top_10_cz, aes(x = reorder(CZ_NAME, -total_casualties), y = total_casualties)) +
+  geom_bar(stat = "identity", fill = "lightblue") +
+  geom_text(aes(label = total_casualties), vjust = -0.2, size = 3.5) +
+  labs(
+    title = "The 10 places with the most casualties",
+    x = "CZ Name",
+    y = "Total Casualties"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+  geom_text(aes(label = total_casualties), vjust = -0.5, size = 3)
+
+
+```
+
+
+
+
+
+```{r}
+
+```
+
+
+
+
+```{r}
+# Load the necessary packages (install them if not already installed)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+
+# Assuming your data frame is named 'eda2'
+# First, convert the EVENT_ID and BEGIN_DATE_TIME columns to strings
+eda2 <- eda2 %>%
+  mutate(
+    EVENT_ID = as.character(EVENT_ID),
+    BEGIN_DATE_TIME = as.character(BEGIN_DATE_TIME)
+  )
+
+# Convert the BEGIN_DATE_TIME column to a date type
+eda2$BEGIN_DATE_TIME <- ymd_hms(eda2$BEGIN_DATE_TIME)
+
+# Extract the month and calculate the count of flood events for each month
+eda2 <- eda2 %>%
+  mutate(
+    Month = month(BEGIN_DATE_TIME, label = TRUE)
+  ) %>%
+  group_by(Month) %>%
+  summarize(Flood_Count = n())
+
+# Create a month order
+month_order <- month.abb
+
+
+
+```
+
+
+
+### 3.3
+
+## 
+
+## 4 Cnclusions and summary
+
+## 
+
+## 5 Limitations and future plan
+
+## 
+
+## Reference
